@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  # Shared KeyDB for all services
+  keydb:
+    image: eqalpha/keydb
+    container_name: keydb
+    ports:
+      - '6399:6379'
+    networks:
+      - shared-network
+
+  # PostgreSQL for User Service
+  user-db:
+    image: postgres:16
+    container_name: user-db
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=user_service_db
+    volumes:
+      - user-db-data:/var/lib/postgresql/data
+    ports:
+      - '5455:5432'
+    networks:
+      - shared-network
+
+  # API Gateway
+  api-gateway:
+    build: ../api-gateway
+    container_name: api-gateway
+    environment:
+      - KEYDB_HOST=keydb
+      - KEYDB_PORT=6379
+    ports:
+      - '8080:8080'
+    networks:
+      - shared-network
+    depends_on:
+      - keydb
+
+  # User Service
+  user-service:
+    build: ../user-service
+    container_name: user-service
+    environment:
+      - KEYDB_HOST=keydb
+      - KEYDB_PORT=6379
+      - DB_URL=jdbc:postgresql://user-db:5432/user_service_db
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+    ports:
+      - '8081:8081'
+    networks:
+      - shared-network
+    depends_on:
+      - keydb
+      - user-db
+
+networks:
+  shared-network:
+    driver: bridge
+
+volumes:
+  user-db-data:
